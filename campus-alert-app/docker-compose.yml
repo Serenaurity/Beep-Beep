@@ -1,0 +1,65 @@
+﻿version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: campus_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - campus_network
+
+  backend:
+    build: ./backend
+    container_name: campus_backend
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+    depends_on:
+      - db
+      - redis
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+    networks:
+      - campus_network
+
+  redis:
+    image: redis:7-alpine
+    container_name: campus_redis
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - campus_network
+
+  nginx:
+    build: ./nginx
+    container_name: campus_nginx
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - campus_network
+
+volumes:
+  postgres_data:
+  uploads:
+
+networks:
+  campus_network:
+    driver: bridge
